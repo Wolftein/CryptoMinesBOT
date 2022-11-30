@@ -4,7 +4,7 @@ import club.minnced.discord.webhook.WebhookClient;
 import club.minnced.discord.webhook.WebhookClientBuilder;
 import club.minnced.discord.webhook.send.WebhookEmbed;
 import club.minnced.discord.webhook.send.WebhookEmbedBuilder;
-import com.github.wolftein.cryptomines.Crypto;
+import com.github.wolftein.cryptomines.CryptoMinesAPI;
 import com.github.wolftein.cryptomines.model.Worker;
 import org.decimal4j.util.DoubleRounder;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
@@ -16,16 +16,16 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
 
-public class Bot implements Crypto.Listener {
+public class Bot implements CryptoMinesAPI.Listener {
     private final static DecimalFormat FORMAT_PRICE = new DecimalFormat("##.####");
 
-    private final static double MAX_TRADING = 10;
-    private final static double MIN_TRADING = 3;
+    private final static double MAX_TRADING = 3;
+    private final static double MIN_TRADING = 1;
 
     private final WebhookClient DISCORD;
 
     private final static class Catalog {
-        private final List<Double> mValues = new ArrayList<>();
+        private List<Double> mValues = new ArrayList<>();
         private double mMedian;
         private int mSkip = 0;
 
@@ -56,13 +56,13 @@ public class Bot implements Crypto.Listener {
     }
 
     private final String mAddress;
-    private final Crypto mCryptoMinesAPI;
+    private final CryptoMinesAPI mCryptoMinesAPI;
     private Map<Long, Catalog> mCatalogs = new HashMap<>();
     private final boolean mBuyingMode;
     private final boolean mUnlistMode;
 
-    private final Set<BigInteger> mSales = new ConcurrentSkipListSet<>();
-    private final Set<BigInteger> mBuying = new ConcurrentSkipListSet<>();
+    private Set<BigInteger> mSales = new ConcurrentSkipListSet<>();
+    private Set<BigInteger> mBuying = new ConcurrentSkipListSet<>();
 
     private final ScheduledExecutorService mScheduler = Executors.newScheduledThreadPool(3);
 
@@ -79,20 +79,18 @@ public class Bot implements Crypto.Listener {
     private final Report mPreviousReport = new Report();
     private boolean mLocked = false;
 
-    private int mSettingTradePosition = 4;
+    private int mSettingTradePosition = 8;
     private int mSettingTradeCount = 2;
     private double mSettingTradeMin = 0.003;
     private double mSettingTradeMax = 0.225;
     private int mSettingTradeMinMP = 75;
     private int mSettingTradeMaxMP = 105;
-    private double mSettingFree = 0.015;
-    private double mBalance = 0.0f;
 
-    public Bot(String address, String key, boolean buyingMode, boolean unlistMode) {
+    public Bot(String address, String key, String endpoint, boolean buyingMode, boolean unlistMode) throws IOException {
         mAddress = address;
 
         WebhookClientBuilder builder = new WebhookClientBuilder(
-                "https://discord.com/api/webhooks/908031890324336731/z0wla9HiwoKO8FS2Ty3VKp592gXLKMpsXC9WsrrJ-iIJcrRrXic48dxRCkUtXw4mbDx6");
+                "https://discord.com/api/webhooks/913453765280014417/A-U2wUtCW2qR9yl5C83woABOZsj4zCETznq6clod4BZMi7h2UP0kJIdRpiKLD4Kan_ZZ");
         builder.setThreadFactory((job) -> {
             Thread thread = new Thread(job);
             thread.setName("DISCORD");
@@ -104,8 +102,8 @@ public class Bot implements Crypto.Listener {
         mBuyingMode = buyingMode;
         mUnlistMode = unlistMode;
 
-        mCryptoMinesAPI = new Crypto(this);
-        mCryptoMinesAPI.connect(key);
+        mCryptoMinesAPI = new CryptoMinesAPI(this);
+        mCryptoMinesAPI.connect(endpoint, key);
 
         try {
             DataInputStream in = new DataInputStream(new FileInputStream("Data.bin"));
@@ -123,7 +121,7 @@ public class Bot implements Crypto.Listener {
             mReport.Difference = mPreviousReport.Difference = 0;
             mReport.Difference = in.readDouble();
             mPreviousReport.Difference = mReport.Difference;
-        } catch (IOException ignored) {
+        } catch (IOException exception) {
         }
 
         Properties prop = new Properties();
@@ -137,14 +135,13 @@ public class Bot implements Crypto.Listener {
             mSettingTradeMax = Double.parseDouble(prop.getProperty("Trade.Max"));
             mSettingTradeMinMP = Integer.parseInt(prop.getProperty("Trade.MinMP"));
             mSettingTradeMaxMP = Integer.parseInt(prop.getProperty("Trade.MaxMP"));
-            mSettingFree = Double.parseDouble(prop.getProperty("Trade.Fee"));
-        } catch (IOException ignored) {
+        } catch (IOException ex) {
         }
     }
 
     public void run() {
-        mBalance = mCryptoMinesAPI.getBalance(mAddress);
-        System.out.println(mBalance);
+
+        /*
         mScheduler.scheduleAtFixedRate(() -> {
             synchronized (mReport) {
                 if (mPreviousReport.Succeeds != mReport.Succeeds
@@ -158,12 +155,12 @@ public class Bot implements Crypto.Listener {
                     mPreviousReport.Spent = mReport.Spent;
                     mPreviousReport.Difference = mReport.Difference;
 
-                    mBalance = mCryptoMinesAPI.getBalance(mAddress);
+                    double balance = mCryptoMinesAPI.getBalance(mAddress);
 
                     final WebhookEmbed embed = new WebhookEmbedBuilder()
                             .setColor(0xADFF2F)
                             .setTitle(new WebhookEmbed.EmbedTitle("Estado (" + (mLocked ? "Pasivo" : "Activo") + ")", null))
-                            .addField(new WebhookEmbed.EmbedField(false, "Balance", FORMAT_PRICE.format(mBalance)))
+                            .addField(new WebhookEmbed.EmbedField(false, "Balance", FORMAT_PRICE.format(balance)))
                             .addField(new WebhookEmbed.EmbedField(false, "Compras", String.valueOf(mPreviousReport.Succeeds)))
                             .addField(new WebhookEmbed.EmbedField(false, "Fallos", String.valueOf(mPreviousReport.Fails)))
                             .addField(new WebhookEmbed.EmbedField(false, "Ventas", String.valueOf(mPreviousReport.Solds)))
@@ -181,12 +178,14 @@ public class Bot implements Crypto.Listener {
                         out.writeDouble(mPreviousReport.Spent);
                         out.writeDouble(mPreviousReport.Earned);
                         out.writeDouble(mPreviousReport.Difference);
-                    } catch (IOException ignored) {
+                    } catch (IOException e) {
                     }
 
                 }
             }
         }, 0L, 1, TimeUnit.MINUTES);
+
+         */
         mScheduler.scheduleAtFixedRate(mCryptoMinesAPI::poll, 0L, 5000, TimeUnit.MILLISECONDS);
 
         if (mBuyingMode) {
@@ -210,8 +209,9 @@ public class Bot implements Crypto.Listener {
 
                     final Catalog catalog = mCatalogs.get(worker.getPower());
 
-                    if (catalog != null && Crypto.fromWei(worker.getPrice()) > catalog.getMedian())
+                    if (catalog != null && CryptoMinesAPI.fromWei(worker.getPrice()) > catalog.getMedian())
                     {
+
                         System.out.println("UNLIST:" + worker);
 
                         mCryptoMinesAPI.unlist(worker);
@@ -247,7 +247,7 @@ public class Bot implements Crypto.Listener {
                 ++catalog.mSkip;
             } else {
                 if (catalog.getSize() < mSettingTradeCount) {
-                    catalog.addValue(Crypto.fromWei(worker.getPrice()));
+                    catalog.addValue(CryptoMinesAPI.fromWei(worker.getPrice()));
                 }
             }
         }
@@ -323,9 +323,9 @@ public class Bot implements Crypto.Listener {
 
             sell = Double.parseDouble(FORMAT_PRICE.format(sell - 0.0001));
 
-            final double price = Crypto.fromWei(worker.getPrice());
+            final double price = CryptoMinesAPI.fromWei(worker.getPrice());
 
-            final double winning = (sell * 0.85) - mSettingFree;
+            final double winning = (sell * 0.85) - 0.002;
             final double profit = winning - price;
 
             System.out.println(Double.parseDouble(FORMAT_PRICE.format(profit)) + "\t| " + worker);
@@ -358,7 +358,7 @@ public class Bot implements Crypto.Listener {
 
             synchronized (mReport) {
                 ++mReport.Succeeds;
-                mReport.Spent += Crypto.fromWei(worker.getPrice());
+                mReport.Spent += CryptoMinesAPI.fromWei(worker.getPrice());
                 mReport.Difference += (worker.getProfit());
             }
 
@@ -376,7 +376,9 @@ public class Bot implements Crypto.Listener {
     public void onSell(Worker worker, TransactionReceipt result) {
         final boolean success = (result != null && result.isStatusOK());
 
-        if (!success) {
+        if (!success && worker.getTries() < 4) {
+            worker.setTries(worker.getTries() + 1);
+
             mCryptoMinesAPI.sell(worker);
         }
     }
@@ -387,7 +389,7 @@ public class Bot implements Crypto.Listener {
             mBuying.remove(worker.getToken());
             mSales.add(worker.getToken());
 
-            final double price = Crypto.fromWei(worker.getPrice());
+            final double price = CryptoMinesAPI.fromWei(worker.getPrice());
             final double winning = price * 0.85;
 
             synchronized (mReport) {

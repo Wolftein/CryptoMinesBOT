@@ -73,8 +73,8 @@ public class ProxieContract extends Contract {
 
     public RemoteFunctionCall<byte[]> onERC721Received(String param0, String param1, BigInteger param2, byte[] param3) {
         final Function function = new Function(FUNC_ONERC721RECEIVED,
-                Arrays.<Type>asList(new Address(160, param0),
-                        new Address(160, param1),
+                Arrays.<Type>asList(new org.web3j.abi.datatypes.Address(160, param0),
+                        new org.web3j.abi.datatypes.Address(160, param1),
                         new org.web3j.abi.datatypes.generated.Uint256(param2),
                         new org.web3j.abi.datatypes.DynamicBytes(param3)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bytes4>() {}));

@@ -1,21 +1,24 @@
 package com.github.wolftein.cryptomines.model;
 
+import com.github.wolftein.cryptomines.CryptoMinesAPI;
 import org.json.JSONObject;
-import org.web3j.utils.Convert;
 
 import java.math.BigInteger;
 
 public final class Worker {
 
+    private BigInteger mClock;
     private BigInteger mID;
     private BigInteger mToken;
     private BigInteger mPrice;
+    private double mSell;
+    private double mProfit;
     private String mSeller;
     private String mBuyer;
     private long mLevel;
     private long mPower;
-    private double mSell;
-    private double mProfit;
+    private long mTries = 0;
+    private long mBlock = 0;
 
     public Worker() {
     }
@@ -30,6 +33,14 @@ public final class Worker {
         final JSONObject nftData = object.getJSONObject("nftData");
         mLevel = nftData.getLong("level");
         mPower = nftData.getLong("minePower");
+    }
+
+    public BigInteger getClock() {
+        return mClock;
+    }
+
+    public void setClock(BigInteger clock) {
+        this.mClock = clock;
     }
 
     public BigInteger getID() {
@@ -62,10 +73,6 @@ public final class Worker {
 
     public void setToken(BigInteger token) {
         this.mToken = token;
-    }
-
-    public double getEternal() {
-        return Convert.fromWei(mPrice.toString(), Convert.Unit.ETHER).doubleValue();
     }
 
     public BigInteger getPrice() {
@@ -108,12 +115,28 @@ public final class Worker {
         this.mPower = power;
     }
 
+    public long getTries() {
+        return mTries;
+    }
+
+    public void setTries(long tries) {
+        this.mTries = tries;
+    }
+
+    public long getBlock() {
+        return mBlock;
+    }
+
+    public void setBlock(long block) {
+        this.mBlock = block;
+    }
+
     public boolean isSold() {
         return !mBuyer.equals("0x0000000000000000000000000000000000000000");
     }
 
     @Override
     public String toString() {
-        return "[ID=" + mID + ", TOKEN=" + mToken + ", SELLER=" + mSeller + ", PRICE=" + getEternal() + ", \tLEVEL=" + mLevel + ", POWER=" + mPower;
+        return "[ID=" + mID + ", TOKEN=" + mToken + ", SELLER=" + mSeller + ", PRICE=" + CryptoMinesAPI.fromWei(mPrice) + ", \tLEVEL=" + mLevel + ", POWER=" + mPower;
     }
 }

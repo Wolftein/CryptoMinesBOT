@@ -1,11 +1,15 @@
 package com.github.wolftein;
 
+import java.io.IOException;
+
 public class Bootstrap {
-    private final static String ADDRESS = "0x9197728D61BFd3695071e385C12B1D5E041bC44f";
+    private final static String ADDRESS = "0x756dB42886D700B4553A5bfffB3FfeaE20159e5E";
 
-    private final static String SECRET = "GET_YOUR_OWN_SECRET_KEY";
+    private final static String SECRET = "GET_YOUR_OWN_PRIVATE_KEY";
 
-    public static void main(String[] argv) {
-        new Bot(ADDRESS, SECRET, Boolean.parseBoolean(argv[0]), Boolean.parseBoolean(argv[1])).run();
+    public static void main(String[] argv) throws IOException {
+        boolean isUnlist = (argv.length >= 3 && Boolean.parseBoolean(argv[2]));
+
+        new Bot(ADDRESS, SECRET, argv[0], Boolean.parseBoolean(argv[1]), isUnlist).run();
     }
 }
