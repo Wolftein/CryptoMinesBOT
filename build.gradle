@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '6.1.0'
+}
+
+group 'org.example'
+version '1.0-SNAPSHOT'
+
+mainClassName = 'com.github.wolftein.Bootstrap'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.9.0")
+    implementation group: 'org.json', name: 'json', version: '20210307'
+    compile 'org.web3j:core:4.8.9'
+    compile("club.minnced:discord-webhooks:0.7.2")
+    compile 'org.decimal4j:decimal4j:1.0.3'
+    compile 'org.slf4j:slf4j-log4j12:1.7.30'
+    compile 'org.dhatim:fastexcel:0.12.8'
+
+}
+
+test {
+    useJUnitPlatform()
+}
